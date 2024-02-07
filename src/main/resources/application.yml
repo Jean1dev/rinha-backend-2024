@@ -1,0 +1,28 @@
+server:
+  port: ${PORT:8080}
+  compression:
+    enabled: true
+
+spring:
+  threads:
+    virtual:
+      enabled: true
+
+  jpa:
+    properties:
+      hibernate:
+        show_sql: false
+    ddl-auto: none
+    show_sql: false
+    open-in-view: false
+    show-sql: false
+
+  datasource:
+    hikari:
+      connection-timeout: 600000
+      maxLifetime: 600000
+      maximumPoolSize: 150
+    driverClassName: org.postgresql.Driver
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/app}
+    username: ${SPRING_DATASOURCE_USERNAME:admin}
+    password: ${SPRING_DATASOURCE_PASSWORD:123456}
