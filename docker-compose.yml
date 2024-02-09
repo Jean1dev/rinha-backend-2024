@@ -2,6 +2,7 @@ version: '3.5'
 
 services:
   api1: &api
+    #image: jeanlucafp/rinhabackend2024java:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -19,8 +20,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.45'
-          memory: '0.7GB'
+          cpus: "0.6"
+          memory: "200MB"
 
   api2:
     <<: *api
@@ -40,12 +41,12 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.1'
-          memory: '0.2GB'
+          cpus: "0.17"
+          memory: "10MB"
 
   postgres:
     image: postgres:latest
-    command: 'postgres -c shared_buffers=640MB -c max_connections=330 -c effective_cache_size=1GB -c maintenance_work_mem=384MB'
+    command: 'postgres -c config_file=/etc/postgresql/pg.config'
     hostname: postgres
     environment:
       - POSTGRES_DB=app
@@ -54,14 +55,15 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - ./dbconfig/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - ./dbconfig/pg.config:/etc/postgresql/pg.config
     networks:
       - rinha
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: '1.2GB'
+          cpus: "0.13"
+          memory: "140MB"
 
 networks:
   rinha:

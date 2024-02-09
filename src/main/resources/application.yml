@@ -19,9 +19,9 @@ spring:
 
   datasource:
     hikari:
-      connection-timeout: 600000
-      maxLifetime: 600000
-      maximumPoolSize: 150
+      connection-timeout: 300000
+      maxLifetime: 300000
+      maximumPoolSize: 125
     driverClassName: org.postgresql.Driver
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/app}
     username: ${SPRING_DATASOURCE_USERNAME:jeanfernandes}

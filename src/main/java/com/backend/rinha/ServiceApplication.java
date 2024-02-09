@@ -64,6 +64,7 @@ public class ServiceApplication {
     }
 
     public TransacaoOutputDto makeTransacao(Long cliente_id, TransacaoInputDto dto) {
+        validDto(dto);
         Optional<Saldo> saldoOpt = jdbcTemplate.query("select valor, limite from saldos where cliente_id = ?  FOR UPDATE NOWAIT",
                 rs -> rs.next() ? Optional.ofNullable(Saldo.simplificado.mapRow(rs, 1)) : Optional.empty(),
                 cliente_id);
@@ -80,8 +81,23 @@ public class ServiceApplication {
             output = realizarTransacaoNoCredito(saldo, dto, cliente_id);
         }
 
-        transacaos.add(Transacao.build(cliente_id, dto.valor(), dto.tipo(), dto.descricao(), null));
+        //transacaos.add(Transacao.build(cliente_id, dto.valor(), dto.tipo(), dto.descricao(), null));
+        inserirTransacao(Transacao.build(cliente_id, dto.valor(), dto.tipo(), dto.descricao(), null));
         return output;
+    }
+
+    private void validDto(TransacaoInputDto dto) {
+        if (dto.descricao().length() > 10) {
+            throw new HttpClientErrorException(HttpStatusCode.valueOf(422), "Descrição muito longa");
+        }
+
+        if ('c' != dto.tipo() && 'd' != dto.tipo()) {
+            throw new HttpClientErrorException(HttpStatusCode.valueOf(422), "Tipo inválido");
+        }
+    }
+
+    private void inserirTransacao(Transacao build) {
+        jdbcTemplate.update("insert into transacoes (cliente_id, valor, tipo, descricao) values (?, ?, ?, ?)", build.getCliente_id(), build.getValor(), build.getTipo(), build.getDescricao());
     }
 
     private TransacaoOutputDto realizarTransacaoNoCredito(Saldo saldo, TransacaoInputDto dto, Long cliente_id) {
@@ -93,7 +109,7 @@ public class ServiceApplication {
     private TransacaoOutputDto realizarTransacaoNoDebito(Saldo saldo, TransacaoInputDto dto, Long cliente_id) {
         var novoSaldo = saldo.getValor() - dto.valor();
 
-        if (novoSaldo < saldo.getLimite() * -1) {
+        if (saldo.getLimite() + novoSaldo < 0) {
             throw new HttpClientErrorException(HttpStatusCode.valueOf(422), "Saldo insuficiente");
         }
 
