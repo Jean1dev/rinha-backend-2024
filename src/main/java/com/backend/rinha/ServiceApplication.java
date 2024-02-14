@@ -32,6 +32,8 @@ public class ServiceApplication {
         this.saldoRepository = saldoRepository;
     }
 
+
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public Mono<ExtratoOutputDto> extrato(Integer cliente_id) {
         validateId(cliente_id);
         var pageable = PageRequest.of(0, 10, Sort.by(Sort.Order.desc("id")));
