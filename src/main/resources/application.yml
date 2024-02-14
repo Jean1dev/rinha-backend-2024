@@ -1,28 +1,19 @@
+pgconfig:
+  username: ${SPRING_DATASOURCE_USERNAME:jeanfernandes}
+  password: ${SPRING_DATASOURCE_PASSWORD:1234}
+  url: ${SPRING_DATASOURCE_URL:r2dbc:postgresql://${pgconfig.username}:${pgconfig.password}@localhost:5432/app}
+
 server:
   port: ${PORT:8080}
   compression:
     enabled: true
 
 spring:
-  threads:
-    virtual:
-      enabled: true
+  r2dbc:
+    url: ${pgconfig.url}
 
-  jpa:
-    properties:
-      hibernate:
-        show_sql: false
-    ddl-auto: none
-    show_sql: false
-    open-in-view: false
-    show-sql: false
+  data:
+    r2dbc:
+      repositories:
+        enabled: true
 
-  datasource:
-    hikari:
-      connection-timeout: 300000
-      maxLifetime: 300000
-      maximumPoolSize: 125
-    driverClassName: org.postgresql.Driver
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/app}
-    username: ${SPRING_DATASOURCE_USERNAME:jeanfernandes}
-    password: ${SPRING_DATASOURCE_PASSWORD:1234}

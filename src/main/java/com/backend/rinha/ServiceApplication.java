@@ -2,92 +2,86 @@ package com.backend.rinha;
 
 import com.backend.rinha.dto.*;
 import com.backend.rinha.model.Saldo;
+import com.backend.rinha.model.SaldoRepository;
 import com.backend.rinha.model.Transacao;
+import com.backend.rinha.model.TransacaoRepository;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatusCode;
-import org.springframework.jdbc.core.BatchPreparedStatementSetter;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.scheduling.annotation.EnableScheduling;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.Queue;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.stream.Collectors;
 
 @Service
-@EnableScheduling
 public class ServiceApplication {
 
-    private final JdbcTemplate jdbcTemplate;
+    private final TransacaoRepository transacaoRepository;
+    private final SaldoRepository saldoRepository;
     private static final ConcurrentLinkedQueue<Transacao> transacaos = new ConcurrentLinkedQueue<>();
 
-    public ServiceApplication(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public ServiceApplication(TransacaoRepository transacaoRepository, SaldoRepository saldoRepository) {
+        this.transacaoRepository = transacaoRepository;
+        this.saldoRepository = saldoRepository;
     }
 
-    @Scheduled(fixedDelay = 1000, initialDelay = 2000)
-    public void agendarInsercaoTransacao() {
-        final Queue<Transacao> batchQueue = new ConcurrentLinkedQueue<>();
-        transacaos.forEach(transacao -> {
-            batchQueue.add(transacaos.poll());
-        });
+    public Mono<ExtratoOutputDto> extrato(Integer cliente_id) {
+        validateId(cliente_id);
+        var pageable = PageRequest.of(0, 10, Sort.by(Sort.Order.desc("id")));
+        return saldoRepository.findByClienteId(cliente_id)
+                .cache()
+                .subscribeOn(Schedulers.parallel())
+                .map(saldo ->
+                        new ExtratoOutputDto(new SaldoDto(saldo.getValor(), LocalDateTime.now(), saldo.getLimite()), null))
+                .map(extratoOutputDto -> {
+                    Mono<ExtratoOutputDto> dtoMono = transacaoRepository.findAllByClienteId(cliente_id, pageable)
+                            .cache()
+                            .subscribeOn(Schedulers.parallel())
+                            .map(transacao -> new TransacaoDto(transacao.getValor(), transacao.getTipo(), transacao.getDescricao(), transacao.getRealizada_em()))
+                            .collect(Collectors.toUnmodifiableList())
+                            .map(transacaoDtos1 -> new ExtratoOutputDto(
+                                            extratoOutputDto.saldo(),
+                                            transacaoDtos1
+                                    )
+                            );
 
-        batchInsertTransacoes(batchQueue);
+                    return dtoMono;
+                }).flatMap(extratoOutputDtoMono -> extratoOutputDtoMono)
+                .onErrorResume(throwable -> {
+                    throw new HttpClientErrorException(HttpStatusCode.valueOf(404), throwable.getLocalizedMessage());
+                });
     }
 
-    public ExtratoOutputDto extrato(Long cliente_id) {
-        Optional<Saldo> saldoOpt = jdbcTemplate.query("select valor, limite from saldos where cliente_id = ?",
-                rs -> rs.next() ? Optional.ofNullable(Saldo.simplificado.mapRow(rs, 1)) : Optional.empty(),
-                cliente_id);
-
-        if (saldoOpt.isEmpty()) {
-            throw new HttpClientErrorException(HttpStatusCode.valueOf(404), "Cliente não encontrado");
-        }
-
-        List<TransacaoDto> transacaoDtos = jdbcTemplate.query("select valor, tipo, descricao, realizada_em from transacoes where cliente_id = ? ORDER BY id DESC LIMIT 10 ",
-                        Transacao.mapper,
-                        cliente_id)
-                .stream()
-                .map(transacao -> new TransacaoDto(transacao.getValor(), transacao.getTipo(), transacao.getDescricao(), transacao.getRealizada_em()))
-                .collect(Collectors.toUnmodifiableList());
-
-        return new ExtratoOutputDto(
-                new SaldoDto(saldoOpt.get().getValor(), LocalDateTime.now(), saldoOpt.get().getLimite()),
-                transacaoDtos
-        );
-    }
-
-    public TransacaoOutputDto makeTransacao(Long cliente_id, TransacaoInputDto dto) {
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public Mono<TransacaoOutputDto> makeTransacao(Integer cliente_id, TransacaoInputDto dto) {
+        validateId(cliente_id);
         validDto(dto);
-        Optional<Saldo> saldoOpt = jdbcTemplate.query("select valor, limite from saldos where cliente_id = ?  FOR UPDATE NOWAIT",
-                rs -> rs.next() ? Optional.ofNullable(Saldo.simplificado.mapRow(rs, 1)) : Optional.empty(),
-                cliente_id);
-
-        if (saldoOpt.isEmpty()) {
-            throw new HttpClientErrorException(HttpStatusCode.valueOf(404), "Cliente não encontrado");
-        }
-
-        var saldo = saldoOpt.get();
-        TransacaoOutputDto output;
-        if ('d' == dto.tipo()) {
-            output = realizarTransacaoNoDebito(saldo, dto, cliente_id);
-        } else {
-            output = realizarTransacaoNoCredito(saldo, dto, cliente_id);
-        }
-
-        //transacaos.add(Transacao.build(cliente_id, dto.valor(), dto.tipo(), dto.descricao(), null));
-        inserirTransacao(Transacao.build(cliente_id, dto.valor(), dto.tipo(), dto.descricao(), null));
-        return output;
+        Mono<Transacao> saved = inserirTransacao(new Transacao(null, cliente_id, dto.valor(), dto.tipo(), dto.descricao(), LocalDateTime.now()));
+        return saldoRepository.findByClienteId(cliente_id)
+                .flatMap(saldo -> {
+                    if ('d' == dto.tipo()) {
+                        return Mono.just(realizarTransacaoNoDebito(saldo, dto, cliente_id));
+                    } else {
+                        return Mono.just(realizarTransacaoNoCredito(saldo, dto, cliente_id));
+                    }
+                })
+                .flatMap(saldoRepository::save)
+                .flatMap(saved::thenReturn)
+                .flatMap(saldo -> Mono.just(new TransacaoOutputDto(saldo.getLimite(), saldo.getValor())))
+                .onErrorResume(throwable -> {
+                    throw new HttpClientErrorException(HttpStatusCode.valueOf(422), throwable.getLocalizedMessage());
+                });
     }
 
     private void validDto(TransacaoInputDto dto) {
-        if (dto.descricao().length() > 10) {
+        if (Objects.isNull(dto.descricao()) || dto.descricao().length() > 10) {
             throw new HttpClientErrorException(HttpStatusCode.valueOf(422), "Descrição muito longa");
         }
 
@@ -96,45 +90,27 @@ public class ServiceApplication {
         }
     }
 
-    private void inserirTransacao(Transacao build) {
-        jdbcTemplate.update("insert into transacoes (cliente_id, valor, tipo, descricao) values (?, ?, ?, ?)", build.getCliente_id(), build.getValor(), build.getTipo(), build.getDescricao());
+    private Mono<Transacao> inserirTransacao(Transacao build) {
+        return transacaoRepository.save(build);
     }
 
-    private TransacaoOutputDto realizarTransacaoNoCredito(Saldo saldo, TransacaoInputDto dto, Long cliente_id) {
-        var novoLimite = saldo.getLimite() - dto.valor();
-        jdbcTemplate.execute("update saldos set limite = %s where cliente_id = %s".formatted(novoLimite, cliente_id));
-        return new TransacaoOutputDto(novoLimite, saldo.getValor());
+    private Saldo realizarTransacaoNoCredito(Saldo saldo, TransacaoInputDto dto, Integer cliente_id) {
+        var novoLimite = saldo.getValor() + dto.valor();
+        return saldo.withSaldo(novoLimite);
     }
 
-    private TransacaoOutputDto realizarTransacaoNoDebito(Saldo saldo, TransacaoInputDto dto, Long cliente_id) {
+    private Saldo realizarTransacaoNoDebito(Saldo saldo, TransacaoInputDto dto, Integer cliente_id) {
         var novoSaldo = saldo.getValor() - dto.valor();
 
         if (saldo.getLimite() + novoSaldo < 0) {
             throw new HttpClientErrorException(HttpStatusCode.valueOf(422), "Saldo insuficiente");
         }
-
-        jdbcTemplate.execute("update saldos set valor = %s where cliente_id = %s".formatted(novoSaldo, cliente_id));
-        return new TransacaoOutputDto(saldo.getLimite(), novoSaldo);
+        return saldo.withSaldo(novoSaldo);
     }
 
-    private void batchInsertTransacoes(Queue<Transacao> batchQueue) {
-        if (batchQueue.isEmpty())
-            return;
-
-        jdbcTemplate.batchUpdate("insert into transacoes (cliente_id, valor, tipo, descricao) values (?, ?, ?, ?)", new BatchPreparedStatementSetter() {
-            @Override
-            public void setValues(PreparedStatement ps, int i) throws SQLException {
-                Transacao polled = batchQueue.poll();
-                ps.setObject(1, polled.getCliente_id());
-                ps.setObject(2, polled.getValor());
-                ps.setObject(3, polled.getTipo());
-                ps.setObject(4, polled.getDescricao());
-            }
-
-            @Override
-            public int getBatchSize() {
-                return batchQueue.size();
-            }
-        });
+    private void validateId(Integer clienteId) {
+        if (clienteId < 1 || clienteId > 5) {
+            throw new HttpClientErrorException(HttpStatusCode.valueOf(404), "Cliente não encontrado");
+        }
     }
 }

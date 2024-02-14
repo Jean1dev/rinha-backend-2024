@@ -2,9 +2,7 @@ FROM gradle:8.6.0-jdk21-alpine AS builder
 
 WORKDIR /usr/app/
 ENV PORT 8080
-ENV SPRING_DATASOURCE_URL jdbc:postgresql://localhost:5432/app
-ENV SPRING_DATASOURCE_USERNAME jeanfernandes
-ENV SPRING_DATASOURCE_PASSWORD 1234
+ENV SPRING_DATASOURCE_URL r2dbc:postgresql://jeanfernandes:1234@localhost:5432/app
 
 COPY . .
 
@@ -18,4 +16,7 @@ RUN addgroup -S spring && adduser -S spring -G spring
 USER spring:spring
 
 RUN ls /opt/app/
-CMD java -jar /opt/app/application.jar
+ENV JAVA_OPTS="-Xmx100m"
+
+ENTRYPOINT ["java", "-Xms50m", "-Xmx100m", "-XX:+UseSerialGC","-jar", "/opt/app/application.jar"]
+#CMD java -jar /opt/app/application.jar

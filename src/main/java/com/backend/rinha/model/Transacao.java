@@ -1,35 +1,35 @@
 package com.backend.rinha.model;
 
 
-import org.springframework.jdbc.core.RowMapper;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
 import java.time.LocalDateTime;
 
+
+@Table("transacoes")
 public class Transacao {
-    private final int id;
-    private final Long cliente_id;
+    @Id
+    private final Integer id;
+    @Column("cliente_id")
+    private final Integer clienteId;
     private final int valor;
     private final char tipo;
     private final String descricao;
     private final LocalDateTime realizada_em;
 
-    public Transacao(int id, Long clienteId, int valor, char tipo, String descricao, LocalDateTime realizadaEm) {
+    public Transacao(Integer id, Integer clienteId, int valor, char tipo, String descricao, LocalDateTime realizada_em) {
         this.id = id;
-        cliente_id = clienteId;
+        this.clienteId = clienteId;
         this.valor = valor;
         this.tipo = tipo;
         this.descricao = descricao;
-        realizada_em = realizadaEm;
+        this.realizada_em = realizada_em;
     }
 
-    public static RowMapper<Transacao> mapper = (
-            (rs, rowNum) -> {
-                char tipo1 = rs.getObject("tipo").toString().charAt(0);
-                return Transacao.build(null, rs.getInt("valor"), tipo1, rs.getString("descricao"), rs.getTimestamp("realizada_em").toLocalDateTime());
-            }
-    );
 
-    public static Transacao build(Long clienteId, int valor, char tipo, String descricao, LocalDateTime realizadaEm) {
+    public static Transacao build(Integer clienteId, int valor, char tipo, String descricao, LocalDateTime realizadaEm) {
         return new Transacao(0, clienteId, valor, tipo, descricao, realizadaEm);
     }
 
@@ -37,8 +37,8 @@ public class Transacao {
         return id;
     }
 
-    public Long getCliente_id() {
-        return cliente_id;
+    public Integer getCliente_id() {
+        return clienteId;
     }
 
     public int getValor() {
