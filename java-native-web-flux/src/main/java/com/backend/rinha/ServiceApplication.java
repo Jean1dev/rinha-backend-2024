@@ -98,16 +98,20 @@ public class ServiceApplication {
 
     private Saldo realizarTransacaoNoCredito(Saldo saldo, TransacaoInputDto dto, Integer cliente_id) {
         var novoLimite = saldo.getValor() + dto.valor();
+        validateSaldoInsuficiente(saldo, dto);
         return saldo.withSaldo(novoLimite);
     }
 
     private Saldo realizarTransacaoNoDebito(Saldo saldo, TransacaoInputDto dto, Integer cliente_id) {
         var novoSaldo = saldo.getValor() - dto.valor();
+        validateSaldoInsuficiente(saldo, dto);
+        return saldo.withSaldo(novoSaldo);
+    }
 
-        if (saldo.getLimite() + novoSaldo < 0) {
+    private void validateSaldoInsuficiente(Saldo saldo, TransacaoInputDto dto) {
+        if (dto.valor() > (saldo.getValor() + saldo.getLimite())) {
             throw new HttpClientErrorException(HttpStatusCode.valueOf(422), "Saldo insuficiente");
         }
-        return saldo.withSaldo(novoSaldo);
     }
 
     private void validateId(Integer clienteId) {

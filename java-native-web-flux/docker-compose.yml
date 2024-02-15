@@ -2,15 +2,15 @@ version: '3.5'
 
 services:
   api1: &api
-    #image: jeanlucafp/rinhabackend2024java:5
+    #image: jeanlucafp/rinhabackend2024java:latest
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: DockerfileGrallVM
     hostname: api1
     depends_on:
       - postgres
-    expose:
-      - "8080"
+    ports:
+      - "6969:6969"
     environment:
       - SPRING_DATASOURCE_URL=r2dbc:postgresql://jeanfernandes:1234@postgres:5432/app
     networks:
@@ -18,12 +18,14 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.6"
-          memory: "130MB"
+          cpus: "0.5"
+          memory: "175MB"
 
   api2:
     <<: *api
     hostname: api2
+    ports:
+      - "9696:6969"
 
   nginx:
     image: nginx:latest
@@ -39,7 +41,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.2"
+          cpus: "0.06"
           memory: "30MB"
 
   postgres:
@@ -60,8 +62,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.10"
-          memory: "260MB"
+          cpus: "0.3"
+          memory: "130MB"
 
 networks:
   rinha:

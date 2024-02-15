@@ -16,9 +16,11 @@ CREATE TABLE saldos (
 	limite INTEGER NOT NULL
 );
 
+CREATE INDEX IF NOT EXISTS cliente_id ON saldos (cliente_id);
+
 INSERT INTO saldos (id, cliente_id, valor, limite)
-        VALUES (1, 1, 0, 80000),
-               (2, 2, 0, 100000),
-               (3, 3, 0, 1000000),
-               (4, 4, 0, 500000),
-               (5, 5, 0, 10000000);
+        VALUES (1, 1, 0, 1000 * 100),
+               (2, 2, 0, 800 * 100),
+               (3, 3, 0, 10000 * 100),
+               (4, 4, 0, 100000 * 100),
+               (5, 5, 0, 5000 * 100);

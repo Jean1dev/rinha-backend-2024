@@ -7,7 +7,7 @@ GATLING_BIN_DIR=$HOME/gatling/bin
 GATLING_WORKSPACE="$(pwd)"
 
 runGatling() {
-    sh $GATLING_BIN_DIR/gatling.sh -rm local -s RinhaBackendCrebitosSimulationx2 \
+    sh $GATLING_BIN_DIR/gatling.sh -rm local -s RinhaBackendCrebitosSimulation \
         -rd "Rinha de Backend - 2024/Q1: Crébito" \
         -rf $RESULTS_WORKSPACE \
         -sf "$GATLING_WORKSPACE/src/gatling/scala"

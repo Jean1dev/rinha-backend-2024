@@ -3,11 +3,6 @@ pgconfig:
   password: ${SPRING_DATASOURCE_PASSWORD:1234}
   url: ${SPRING_DATASOURCE_URL:r2dbc:postgresql://${pgconfig.username}:${pgconfig.password}@localhost:5432/app}
 
-server:
-  port: ${PORT:8080}
-  compression:
-    enabled: true
-
 spring:
   r2dbc:
     url: ${pgconfig.url}

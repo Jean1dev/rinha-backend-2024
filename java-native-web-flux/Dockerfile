@@ -19,4 +19,3 @@ RUN ls /opt/app/
 ENV JAVA_OPTS="-Xmx100m"
 
 ENTRYPOINT ["java", "-Xms50m", "-Xmx100m", "-XX:+UseSerialGC","-jar", "/opt/app/application.jar"]
-#CMD java -jar /opt/app/application.jar
