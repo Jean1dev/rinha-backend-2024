@@ -22,3 +22,5 @@ gradle-app.setting
 .project
 # JDT-specific (Eclipse Java Development Tools)
 .classpath
+go-version/__debug_bin4047199316
+.vscode/launch.json
