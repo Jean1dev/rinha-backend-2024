@@ -24,3 +24,5 @@ gradle-app.setting
 .classpath
 go-version/__debug_bin4047199316
 .vscode/launch.json
+clojure-datomic/clojure-datomic.iml
+clojure-datomic/doc/intro.md
